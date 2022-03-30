@@ -1,11 +1,20 @@
 import telebot
+import flask
 from telebot import types
 from db import DbHandler
-from config import TOKEN
+from config
 from keyboa import Keyboa
 
-bot = telebot.TeleBot(TOKEN)
+WEBHOOK_URL_BASE = "https://{}:{}".format(config.WEBHOOK_HOST, config.WEBHOOK_PORT)
+WEBHOOK_URL_PATH = "/{}/".format(config.TOKEN)
 
+bot = telebot.TeleBot(config.TOKEN, threaded=False)  # бесплатный аккаунт pythonanywhere запрещает работу с несколькими тредами
+
+bot.remove_webhook()
+
+bot.set_webhook(url=WEBHOOK_URL_BASE+WEBHOOK_URL_PATH)
+
+app = flask.Flask(__name__)
 
 @bot.message_handler(commands=['start'])
 def topic(message):
@@ -27,9 +36,18 @@ def answer(call):
     bot.send_message(call.message.chat.id, to_send, reply_markup=markup)
 
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    bot.polling(none_stop=True)
+@app.route('/', methods=['GET', 'HEAD'])
+def index():
+    return 'ok'
 
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+# обрабатываем вызовы вебхука = функция, которая запускается, когда к нам постучался телеграм
+@app.route(WEBHOOK_URL_PATH, methods=['POST'])
+def webhook():
+    if flask.request.headers.get('content-type') == 'application/json':
+        json_string = flask.request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return ''
+    else:
+        flask.abort(403)
